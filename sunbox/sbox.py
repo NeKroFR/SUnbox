@@ -114,6 +114,66 @@ class SBox:
         return A.tolist()
 
     @lru_cache()
+    def algebraic_normal_form(self):
+        """
+        Returns the Algebraic Normal Form (ANF) of the SBox.
+        ANF[j][u] is the coefficient of the monomial x^u in the
+        polynomial expression of the j-th output bit, where u is a
+        bitmask over the input variables.
+        """
+        nrows = 1 << self.m
+        A = [[(y >> j) & 1 for y in self.S_list] for j in range(self.n)]
+        for j in range(self.n):
+            step = 1
+            while step < nrows:
+                for i in range(0, nrows, step << 1):
+                    for k in range(step):
+                        A[j][i + k + step] ^= A[j][i + k]
+                step <<= 1
+        return A
+
+    @lru_cache()
+    def algebraic_degree(self):
+        """
+        Returns the algebraic degree of the SBox, that is, the
+        maximal degree among the ANF of each output bit.
+        """
+        anf = self.algebraic_normal_form()
+        degree = 0
+        for j in range(self.n):
+            for u in range(1 << self.m):
+                if anf[j][u] and u.bit_count() > degree:
+                    degree = u.bit_count()
+        return degree
+
+    @lru_cache()
+    def boomerang_connectivity_table(self):
+        """
+        Returns the Boomerang Connectivity Table (BCT) of the SBox.
+        BCT[a][b] counts the number of x such that
+        S^-1(S(x)⊕b) ⊕ S^-1(S(x⊕a)⊕b) = a.
+
+        Only defined when the SBox is bijective.
+        """
+        if not self.is_bijective():
+            return None
+
+        n = 1 << self.m
+        Sinv = [0] * n
+        for x, y in enumerate(self.S_list):
+            Sinv[y] = x
+
+        A = [[0] * n for _ in range(n)]
+        for a in range(n):
+            for b in range(n):
+                count = 0
+                for x in range(n):
+                    if Sinv[self.S_list[x] ^ b] ^ Sinv[self.S_list[x ^ a] ^ b] == a:
+                        count += 1
+                A[a][b] = count
+        return A
+
+    @lru_cache()
     def linear_structures(self):
         """
         Returns a list of all three-tuples (b,a,c) (a,b ≥ 1) such that

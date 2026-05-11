@@ -95,3 +95,15 @@ def to_polynomial(x, variable='x'):
     polynomial.reverse()
 
     return " ⊕ ".join(polynomial)
+
+def to_monomial(x, variable='x'):
+    monomial = []
+    i = 0
+    while x > 0:
+        if x % 2 == 1:
+            monomial.append(f'{variable}{i}')
+        x //= 2
+        i += 1
+    monomial.reverse()
+
+    return "·".join(monomial)

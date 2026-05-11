@@ -41,6 +41,18 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '-bct',
+    action = 'store_true',
+    help = 'Compute the Boomerang Connectivity Table of the SBoxes'
+)
+
+parser.add_argument(
+    '-anf',
+    action = 'store_true',
+    help = 'Compute the Algebraic Normal Form of the SBoxes'
+)
+
+parser.add_argument(
     '-auto',
     action = 'store_true',
     help = 'Performs an automatic analysis of the SBoxes and outputs relevant information'
@@ -178,4 +190,36 @@ for sbox_file in args.input_files:
                 f"act_{filename}.{format}"
             )
         print_table(table, format, filename)
+        debug()
+
+    if args.bct:
+        debug("Boomerang Connectivity Table")
+        table = S.boomerang_connectivity_table()
+        if table is None:
+            print("BCT is only defined for bijective SBoxes.")
+        else:
+            format = args.format
+            if args.output == 'stdout':
+                filename = 'stdout'
+            else:
+                filename = os.path.splitext(os.path.basename(sbox_file))[0]
+                filename = os.path.join(
+                    args.output,
+                    f"bct_{filename}.{format}"
+                )
+            print_table(table, format, filename)
+        debug()
+
+    if args.anf:
+        debug("Algebraic Normal Form")
+        anf = S.algebraic_normal_form()
+        for j in range(S.n):
+            terms = []
+            for u in range(1 << S.m):
+                if anf[j][u]:
+                    if u == 0:
+                        terms.append('1')
+                    else:
+                        terms.append(to_monomial(u, 'x'))
+            print(f"y{j} =", ' ⊕ '.join(terms) if terms else '0')
         debug()
