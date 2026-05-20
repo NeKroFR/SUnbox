@@ -237,6 +237,110 @@ class SBox:
 
         return A, B
 
+    def linear_equivalence(self, other):
+        """
+        If they exist, returns invertible binary matrices A, B such
+        that self(x) = B · other(A · x) for all x, where x is
+        expressed as a column binary vector.
+        """
+        if not (self.is_bijective() and other.is_bijective()):
+            return None
+        if self.n != other.n:
+            return None
+
+        n = self.n
+        N = 1 << n
+        S = self.S_list
+        T = other.S_list
+
+        A = [0] * N
+        B = [None] * N
+        B[0] = 0
+
+        def linear_ok(forced):
+            known = [i for i in range(N) if B[i] is not None]
+            for i in forced:
+                for j in known:
+                    k = i ^ j
+                    if B[k] is not None and B[k] != B[i] ^ B[j]:
+                        return False
+            return True
+
+        def search(bit):
+            if bit == n:
+                return True
+            e = 1 << bit
+            span = 1 << bit
+            used = {A[x] for x in range(span)}
+            for g in range(1, N):
+                if g in used:
+                    continue
+                forced = []
+                ok = True
+                for x in range(span):
+                    ax = A[x] ^ g
+                    A[x | e] = ax
+                    t = T[ax]
+                    s = S[x | e]
+                    if B[t] is None:
+                        B[t] = s
+                        forced.append(t)
+                    elif B[t] != s:
+                        ok = False
+                        break
+                if ok and linear_ok(forced) and search(bit + 1):
+                    return True
+                for t in forced:
+                    B[t] = None
+            return False
+
+        if not search(0):
+            return None
+
+        A_mat = [[(A[1 << j] >> i) & 1 for j in range(n)] for i in range(n)]
+        B_mat = [[(B[1 << j] >> i) & 1 for j in range(n)] for i in range(n)]
+        return A_mat, B_mat
+
+    def affine_equivalence(self, other):
+        """
+        If they exist, returns binary matrices A, B and binary column
+        vectors a, b such that self(x) = B · other(A · x ⊕ a) ⊕ b
+        for all x, where x is expressed as a column binary vector.
+        """
+        if not (self.is_bijective() and other.is_bijective()):
+            return None
+        if self.n != other.n:
+            return None
+
+        n = self.n
+        N = 1 << n
+        S = self.S_list
+        T = other.S_list
+
+        for a in range(N):
+            T_a = SBox([T[y ^ a] ^ T[a] for y in range(N)])
+            S_0 = SBox([s ^ S[0] for s in S])
+            result = S_0.linear_equivalence(T_a)
+            if result is None:
+                continue
+            A_mat, B_mat = result
+
+            Ta = T[a]
+            B_Ta = 0
+            for i, row in enumerate(B_mat):
+                bit = 0
+                for j, v in enumerate(row):
+                    if v:
+                        bit ^= (Ta >> j) & 1
+                B_Ta |= bit << i
+            b = S[0] ^ B_Ta
+
+            a_vec = [[(a >> i) & 1] for i in range(n)]
+            b_vec = [[(b >> i) & 1] for i in range(n)]
+            return A_mat, a_vec, B_mat, b_vec
+
+        return None
+
     @lru_cache()
     def maximal_linear_bias(self):
         """

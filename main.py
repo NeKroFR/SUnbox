@@ -41,6 +41,12 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '-eq',
+    action = 'store_true',
+    help = 'Check linear and affine equivalence between the first SBox and each subsequent one'
+)
+
+parser.add_argument(
     '-auto',
     action = 'store_true',
     help = 'Performs an automatic analysis of the SBoxes and outputs relevant information'
@@ -61,6 +67,32 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+
+if args.eq:
+    if len(args.input_files) < 2:
+        debug("Equivalence requires at least 2 SBoxes.")
+    else:
+        reference = SBox.from_file(args.input_files[0])
+        for sbox_file in args.input_files[1:]:
+            debug(f"{args.input_files[0]} vs {sbox_file}")
+            other = SBox.from_file(sbox_file)
+            le = reference.linear_equivalence(other)
+            if le is not None:
+                A, B = le
+                print("Linearly equivalent! S(x) = B·T(A·x), with A, B:")
+                for y in range(reference.n):
+                    print(*A[y], ' \t ', *B[y])
+            else:
+                ae = reference.affine_equivalence(other)
+                if ae is not None:
+                    A, a, B, b = ae
+                    print("Affine equivalent! S(x) = B·T(A·x ⊕ a) ⊕ b, with A, a, B, b:")
+                    for y in range(reference.n):
+                        print(*A[y], ' \t ', a[y][0], ' \t ', *B[y], ' \t ', b[y][0])
+                else:
+                    print("Not affine equivalent.")
+            debug()
+    exit(0)
 
 for sbox_file in args.input_files:
     debug(sbox_file, '\n')
